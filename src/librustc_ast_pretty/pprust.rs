@@ -1630,11 +1630,20 @@ impl<'a> State<'a> {
         }
     }
 
-    fn print_expr_vec(&mut self, exprs: &[P<ast::Expr>], attrs: &[Attribute]) {
+    fn print_expr_vec(&mut self, exprs: &[P<ast::Expr>], fill_expr: &Option<P<ast::Expr>>, attrs: &[Attribute]) {
         self.ibox(INDENT_UNIT);
         self.s.word("[");
         self.print_inner_attributes_inline(attrs);
         self.commasep_exprs(Inconsistent, &exprs[..]);
+        if let Some(ref fill_expr) = *fill_expr {
+            if let Some(prev_elem) = exprs.last() {
+                self.s.word(",");
+                self.maybe_print_trailing_comment(prev_elem.span, Some(fill_expr.span.hi()));
+                self.space_if_not_bol();
+            }
+            self.s.word("..");
+            self.print_expr(fill_expr);
+        }
         self.s.word("]");
         self.end();
     }
@@ -1811,8 +1820,8 @@ impl<'a> State<'a> {
                 self.word_space("box");
                 self.print_expr_maybe_paren(expr, parser::PREC_PREFIX);
             }
-            ast::ExprKind::Array(ref exprs) => {
-                self.print_expr_vec(&exprs[..], attrs);
+            ast::ExprKind::Array(ref exprs, ref fill_expr) => {
+                self.print_expr_vec(&exprs[..], fill_expr, attrs);
             }
             ast::ExprKind::Repeat(ref element, ref count) => {
                 self.print_expr_repeat(element, count, attrs);

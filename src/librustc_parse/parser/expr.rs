@@ -1041,9 +1041,10 @@ impl<'a> Parser<'a> {
         let close = &token::CloseDelim(token::Bracket);
         let kind = if self.eat(close) {
             // Empty vector
-            ExprKind::Array(Vec::new())
+            ExprKind::Array(Vec::new(), None)
         } else {
             // Non-empty vector
+            // TODO: Handle [..0] case
             let first_expr = self.parse_expr()?;
             if self.eat(&token::Semi) {
                 // Repeating array syntax: `[ 0; 512 ]`
@@ -1054,14 +1055,11 @@ impl<'a> Parser<'a> {
                 // Vector with two or more elements.
                 let mut exprs = vec![first_expr];
                 let mut fill_expr = None;
-                loop {
-                    if self.check(close) {
-                        break;
-                    }
-
+                while !self.check(close) && fill_expr.is_none() {
+                    // Try to read a comma separator.
                     let sep = &token::Comma;
                     let sep_err = match self.expect(sep) {
-                        Ok(false) => None,
+                        Ok(false) => Ok(()),
                         Ok(true) => break,
                         Err(err) => {
                             let sp = self.prev_token.span.shrink_to_hi();
@@ -1071,15 +1069,38 @@ impl<'a> Parser<'a> {
                                     self.bump();
                                 }
                             }
-                            Some((err, sp))
+                            Err((err, sp))
                         }
                     };
 
-                    let is_fill_expr = self.eat(&token::DotDot);
-                    let expr = match (self.parse_expr(), sep_err) {
-                        (Ok(t), None) => t,
-                        (Err(err), None) => return Err(err),
-                        (Ok(t), Some(mut sep_err, span)) => {
+                    // Try to read an expression or check for the closing bracket.
+                    let expr_err = {
+                        if self.check(close) {
+                            if let Err((mut err, _)) = sep_err {
+                                err.emit();
+                            }
+                            break;
+                        }
+                        let is_fill_expr = self.eat(&token::DotDot);
+                        match self.parse_expr() {
+                            Ok(t) => {
+                                if is_fill_expr {
+                                    fill_expr = Some(t);
+                                    // TODO: Recover array after dotdot
+                                } else {
+                                    exprs.push(t);
+                                }
+                                Ok(())
+                            }
+                            Err(expr_err) => Err(expr_err),
+                        }
+                    };
+
+                    // Report any errors that occurred.
+                    match (expr_err, sep_err) {
+                        (Ok(_), Ok(())) => {},
+                        (Err(err), Ok(())) => return Err(err),
+                        (Ok(_), Err((mut sep_err, span))) => {
                             // Parsed successfully, therefore we probably only missed a separator.
                             let sep_string = pprust::token_kind_to_string(sep);
                             sep_err
@@ -1090,28 +1111,18 @@ impl<'a> Parser<'a> {
                                     Applicability::MaybeIncorrect,
                                 )
                                 .emit();
-                            t
                         },
-                        (Err(parse_err), Some(sep_err, _)) => {
+                        (Err(mut expr_err), Err((mut sep_err, _))) => {
                             // Parsing failed, so there must be something more serious than just
                             // a missing separator.
                             sep_err.emit();
-                            parse_err.cancel();
+                            expr_err.cancel();
                             break;
                         }
-                    };
-
-                    if is_fill_expr {
-                        fill_expr = Some(expr);
-                        // TODO: Recover array after dotdot
-                        break;
-                    } else {
-                        exprs.push(expr);
                     }
                 }
-                // TODO: Handle trailing comma in non-filled case.
                 self.expect(close)?;
-                ExprKind::Array(exprs, filling_expr)
+                ExprKind::Array(exprs, fill_expr)
             } else {
                 // Vector with one element
                 self.expect(close)?;

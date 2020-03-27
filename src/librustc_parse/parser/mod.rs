@@ -306,10 +306,6 @@ impl SeqSep {
         SeqSep { sep: Some(t), trailing_sep_allowed: true }
     }
 
-    fn no_trailing_allowed(t: TokenKind) -> SeqSep {
-        SeqSep { sep: Some(t), trailing_sep_allowed: false }
-    }
-
     fn none() -> SeqSep {
         SeqSep { sep: None, trailing_sep_allowed: false }
     }
