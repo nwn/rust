@@ -306,6 +306,10 @@ impl SeqSep {
         SeqSep { sep: Some(t), trailing_sep_allowed: true }
     }
 
+    fn no_trailing_allowed(t: TokenKind) -> SeqSep {
+        SeqSep { sep: Some(t), trailing_sep_allowed: false }
+    }
+
     fn none() -> SeqSep {
         SeqSep { sep: None, trailing_sep_allowed: false }
     }
@@ -637,21 +641,28 @@ impl<'a> Parser<'a> {
         let mut recovered = false;
         let mut trailing = false;
         let mut v = vec![];
+        // While none of the end-of-sequence tokens are next...
         while !self.expect_any_with_type(kets, expect) {
+            // Break if we reach EOF or see _any_ closing delimiter: ')', ']', '}'.
             if let token::CloseDelim(..) | token::Eof = self.token.kind {
                 break;
             }
+            // If we're using a separator...
             if let Some(ref t) = sep.sep {
                 if first {
+                    // No separator before the first element.
                     first = false;
                 } else {
+                    // For all elements after the first, expect a preceding `sep`.
                     match self.expect(t) {
-                        Ok(false) => {}
+                        Ok(false) => {} // Successfully consumed a `sep`.
                         Ok(true) => {
+                            // Recovered from an unexpected non-`sep` token. Break out now.
                             recovered = true;
                             break;
                         }
                         Err(mut expect_err) => {
+                            // Unable to recover from an unexpected non-`sep` token.
                             let sp = self.prev_token.span.shrink_to_hi();
                             let token_str = pprust::token_kind_to_string(t);
 

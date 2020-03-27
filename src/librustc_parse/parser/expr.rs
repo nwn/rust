@@ -1050,17 +1050,72 @@ impl<'a> Parser<'a> {
                 let count = self.parse_anon_const_expr()?;
                 self.expect(close)?;
                 ExprKind::Repeat(first_expr, count)
-            } else if self.eat(&token::Comma) {
+            } else if self.check(&token::Comma) {
                 // Vector with two or more elements.
-                let sep = SeqSep::trailing_allowed(token::Comma);
-                let (remaining_exprs, _) = self.parse_seq_to_end(close, sep, |p| p.parse_expr())?;
                 let mut exprs = vec![first_expr];
-                exprs.extend(remaining_exprs);
-                ExprKind::Array(exprs)
+                let mut fill_expr = None;
+                loop {
+                    if self.check(close) {
+                        break;
+                    }
+
+                    let sep = &token::Comma;
+                    let sep_err = match self.expect(sep) {
+                        Ok(false) => None,
+                        Ok(true) => break,
+                        Err(err) => {
+                            let sp = self.prev_token.span.shrink_to_hi();
+                            // Consume any similar tokens and try to keep parsing.
+                            if let Some(ref tokens) = sep.similar_tokens() {
+                                if tokens.contains(&self.token.kind) {
+                                    self.bump();
+                                }
+                            }
+                            Some((err, sp))
+                        }
+                    };
+
+                    let is_fill_expr = self.eat(&token::DotDot);
+                    let expr = match (self.parse_expr(), sep_err) {
+                        (Ok(t), None) => t,
+                        (Err(err), None) => return Err(err),
+                        (Ok(t), Some(mut sep_err, span)) => {
+                            // Parsed successfully, therefore we probably only missed a separator.
+                            let sep_string = pprust::token_kind_to_string(sep);
+                            sep_err
+                                .span_suggestion_short(
+                                    span,
+                                    &format!("missing {}", sep_string),
+                                    sep_string,
+                                    Applicability::MaybeIncorrect,
+                                )
+                                .emit();
+                            t
+                        },
+                        (Err(parse_err), Some(sep_err, _)) => {
+                            // Parsing failed, so there must be something more serious than just
+                            // a missing separator.
+                            sep_err.emit();
+                            parse_err.cancel();
+                            break;
+                        }
+                    };
+
+                    if is_fill_expr {
+                        fill_expr = Some(expr);
+                        // TODO: Recover array after dotdot
+                        break;
+                    } else {
+                        exprs.push(expr);
+                    }
+                }
+                // TODO: Handle trailing comma in non-filled case.
+                self.expect(close)?;
+                ExprKind::Array(exprs, filling_expr)
             } else {
                 // Vector with one element
                 self.expect(close)?;
-                ExprKind::Array(vec![first_expr])
+                ExprKind::Array(vec![first_expr], None)
             }
         };
         let expr = self.mk_expr(lo.to(self.prev_token.span), kind, attrs);
