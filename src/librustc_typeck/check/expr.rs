@@ -269,7 +269,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 ty
             }
             ExprKind::DropTemps(ref e) => self.check_expr_with_expectation(e, expected),
-            ExprKind::Array(ref args) => self.check_expr_array(args, expected, expr),
+            ExprKind::Array(ref elts, ref fill_elt) => self.check_expr_array(elts, fill_elt, expected, expr),
             ExprKind::Repeat(ref element, ref count) => {
                 self.check_expr_repeat(element, count, expected, expr)
             }
@@ -727,8 +727,12 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
     fn is_destructuring_place_expr(&self, expr: &'tcx hir::Expr<'tcx>) -> bool {
         match &expr.kind {
-            ExprKind::Array(comps) | ExprKind::Tup(comps) => {
+            ExprKind::Tup(comps) => {
                 comps.iter().all(|e| self.is_destructuring_place_expr(e))
+            }
+            ExprKind::Array(comps, opt_comps) => {
+                opt_comps.as_ref().map(|e| self.is_destructuring_place_expr(e)).unwrap_or(true)
+                    && comps.iter().all(|e| self.is_destructuring_place_expr(e))
             }
             ExprKind::Struct(_path, fields, rest) => {
                 rest.as_ref().map(|e| self.is_destructuring_place_expr(e)).unwrap_or(true)
@@ -966,7 +970,8 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
     fn check_expr_array(
         &self,
-        args: &'tcx [hir::Expr<'tcx>],
+        elts: &'tcx [hir::Expr<'tcx>],
+        fill_elt: &'tcx Option<&'tcx hir::Expr<'tcx>>,
         expected: Expectation<'tcx>,
         expr: &'tcx hir::Expr<'tcx>,
     ) -> Ty<'tcx> {
@@ -975,16 +980,46 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             _ => None,
         });
 
-        let element_ty = if !args.is_empty() {
+        let element_ty = if !elts.is_empty() {
             let coerce_to = uty.unwrap_or_else(|| {
                 self.next_ty_var(TypeVariableOrigin {
                     kind: TypeVariableOriginKind::TypeInference,
                     span: expr.span,
                 })
             });
-            let mut coerce = CoerceMany::with_coercion_sites(coerce_to, args);
+            // // Attempt to only copy when a fill expression is present.
+            // // This fails since `Expr` isn't `Clone`, so we need to
+            // // copy `&Expr`'s as below.
+            // let (_elts_vec, elts) = if let Some(fill_elt) = fill_elt {
+            //     let mut elts_vec = Vec::with_capacity(elts.len() + 1);
+            //     elts_vec.extend(elts);
+            //     elts_vec.push(fill_elt);
+            //     (elts_vec, &elts_vec[..])
+            // } else {
+            //     (vec![], elts)
+            // };
+
+            // TODO(nwn): Copying all this kinda sucks. What if instead of
+            // `Array(exprs: &[Expr], fill_expr: Option<&Expr>)` we did
+            // `Array(exprs: &[Expr], fill_to_size: bool)` where the
+            // filling expression, if present (`fill_to_size`), is the
+            // last element of `exprs`? In most (all?) cases, we treat
+            // the filling expression just like any other in the array, so
+            // this may actually simplify other code, eliminates this
+            // copy, and also sets us up better for an extension allowing
+            // the filling expression to occur anywhere in the array with
+            // `Array(exprs: &[Expr], fill_expr: Option<usize>)`, where
+            // `fill_expr` denotes the position of the optional filling
+            // expression.
+            let mut elts_vec = Vec::with_capacity(elts.len() + 1);
+            elts_vec.extend(elts);
+            if let Some(fill_elt) = fill_elt {
+                elts_vec.push(fill_elt);
+            }
+            let elts = elts_vec.as_slice();
+            let mut coerce = CoerceMany::with_coercion_sites(coerce_to, elts);
             assert_eq!(self.diverges.get(), Diverges::Maybe);
-            for e in args {
+            for e in elts {
                 let e_ty = self.check_expr_with_hint(e, coerce_to);
                 let cause = self.misc(e.span);
                 coerce.coerce(self, &cause, e, e_ty);
@@ -996,7 +1031,8 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 span: expr.span,
             })
         };
-        self.tcx.mk_array(element_ty, args.len() as u64)
+        // TODO(nwn): This doesn't take into account the fill_expr
+        self.tcx.mk_array(element_ty, elts.len() as u64)
     }
 
     fn check_expr_repeat(

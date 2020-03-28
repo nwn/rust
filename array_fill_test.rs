@@ -5,7 +5,9 @@ fn main() {
     let _x: [i32; 1] = [1,];
     let _x: [i32; 3] = [1, 2, 3];
     let _x: [i32; 3] = [1, 2, 3,];
-    let _x: [i32; 3] = [1, 2, 3, ..4];
+    let _x: [i32; 3] = [1, 2, 3, ..4]; // SHOULD PASS
+    let [_x, _y, ..] = [1, 2, 3, 4]; // SHOULD PASS
+    // let [_x, _y, ..4] = [1, 2, 3, 4]; // SHOULD FAIL
     // let _x: [i32; 3] = [1, 2, 3, ..4,]; // SHOULD FAIL
     // let _x: [i32; 3] = [1, ..2, 3]; // SHOULD FAIL
 }

@@ -1367,7 +1367,7 @@ impl Expr<'_> {
     pub fn precedence(&self) -> ExprPrecedence {
         match self.kind {
             ExprKind::Box(_) => ExprPrecedence::Box,
-            ExprKind::Array(_) => ExprPrecedence::Array,
+            ExprKind::Array(..) => ExprPrecedence::Array,
             ExprKind::Call(..) => ExprPrecedence::Call,
             ExprKind::MethodCall(..) => ExprPrecedence::MethodCall,
             ExprKind::Tup(_) => ExprPrecedence::Tup,
@@ -1550,7 +1550,7 @@ pub enum ExprKind<'hir> {
     /// A `box x` expression.
     Box(&'hir Expr<'hir>),
     /// An array (e.g., `[a, b, c, d]`).
-    Array(&'hir [Expr<'hir>]),
+    Array(&'hir [Expr<'hir>], Option<&'hir Expr<'hir>>),
     /// A function call.
     ///
     /// The first field resolves to the function itself (usually an `ExprKind::Path`),
