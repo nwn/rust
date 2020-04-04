@@ -1061,9 +1061,8 @@ pub fn walk_expr<'v, V: Visitor<'v>>(visitor: &mut V, expression: &'v Expr<'v>) 
     walk_list!(visitor, visit_attribute, expression.attrs.iter());
     match expression.kind {
         ExprKind::Box(ref subexpression) => visitor.visit_expr(subexpression),
-        ExprKind::Array(subexpressions, optional_fill_expr) => {
+        ExprKind::Array(subexpressions, _) => {
             walk_list!(visitor, visit_expr, subexpressions);
-            walk_list!(visitor, visit_expr, optional_fill_expr);
         }
         ExprKind::Repeat(ref element, ref count) => {
             visitor.visit_expr(element);

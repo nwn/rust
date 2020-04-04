@@ -208,9 +208,8 @@ impl<'a, 'tcx> ExprUseVisitor<'a, 'tcx> {
                 }
             }
 
-            hir::ExprKind::Array(ref exprs, ref fill_expr) => {
+            hir::ExprKind::Array(ref exprs, _) => {
                 self.consume_exprs(exprs);
-                fill_expr.map(|e| self.consume_expr(e));
             }
 
             hir::ExprKind::AddrOf(_, m, ref base) => {

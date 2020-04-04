@@ -1550,7 +1550,7 @@ pub enum ExprKind<'hir> {
     /// A `box x` expression.
     Box(&'hir Expr<'hir>),
     /// An array (e.g., `[a, b, c, d]`).
-    Array(&'hir [Expr<'hir>], Option<&'hir Expr<'hir>>),
+    Array(&'hir [Expr<'hir>], bool),
     /// A function call.
     ///
     /// The first field resolves to the function itself (usually an `ExprKind::Path`),

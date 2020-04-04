@@ -233,7 +233,7 @@ crate enum ExprKind<'tcx> {
     },
     Array {
         fields: Vec<ExprRef<'tcx>>,
-        fill_expr: Option<ExprRef<'tcx>>,
+        fill_to_size: bool,
     },
     Tuple {
         fields: Vec<ExprRef<'tcx>>,

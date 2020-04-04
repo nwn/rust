@@ -1057,7 +1057,7 @@ impl Expr {
                 expr.to_ty().map(|ty| TyKind::Array(ty, expr_len.clone()))?
             }
 
-            ExprKind::Array(exprs, None) if exprs.len() == 1 => exprs[0].to_ty().map(TyKind::Slice)?,
+            ExprKind::Array(exprs, false) if exprs.len() == 1 => exprs[0].to_ty().map(TyKind::Slice)?,
 
             ExprKind::Tup(exprs) => {
                 let tys = exprs.iter().map(|expr| expr.to_ty()).collect::<Option<Vec<_>>>()?;
@@ -1140,7 +1140,7 @@ pub enum ExprKind {
     /// A `box x` expression.
     Box(P<Expr>),
     /// An array (`[a, b, c, d]`)
-    Array(Vec<P<Expr>>, Option<P<Expr>>),
+    Array(Vec<P<Expr>>, bool),
     /// A function call
     ///
     /// The first field resolves to the function itself,

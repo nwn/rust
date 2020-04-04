@@ -327,7 +327,7 @@ impl<'a> ExtCtxt<'a> {
     }
 
     pub fn expr_vec(&self, sp: Span, exprs: Vec<P<ast::Expr>>) -> P<ast::Expr> {
-        self.expr(sp, ast::ExprKind::Array(exprs, None /* FIX ME? */))
+        self.expr(sp, ast::ExprKind::Array(exprs, false /* TODO(nwn): FIX ME? */))
     }
     pub fn expr_vec_slice(&self, sp: Span, exprs: Vec<P<ast::Expr>>) -> P<ast::Expr> {
         self.expr_addr_of(sp, self.expr_vec(sp, exprs))

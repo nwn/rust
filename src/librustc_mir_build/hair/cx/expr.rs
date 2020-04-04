@@ -552,7 +552,7 @@ fn make_mirror_unadjusted<'a, 'tcx>(
         }
         hir::ExprKind::DropTemps(ref source) => ExprKind::Use { source: source.to_ref() },
         hir::ExprKind::Box(ref value) => ExprKind::Box { value: value.to_ref() },
-        hir::ExprKind::Array(ref fields, ref fill_expr) => ExprKind::Array { fields: fields.to_ref(), fill_expr: fill_expr.to_ref() },
+        hir::ExprKind::Array(ref fields, fill_to_size) => ExprKind::Array { fields: fields.to_ref(), fill_to_size },
         hir::ExprKind::Tup(ref fields) => ExprKind::Tuple { fields: fields.to_ref() },
 
         hir::ExprKind::Yield(ref v, _) => ExprKind::Yield { value: v.to_ref() },

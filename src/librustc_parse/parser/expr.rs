@@ -1041,7 +1041,7 @@ impl<'a> Parser<'a> {
         let close = &token::CloseDelim(token::Bracket);
         let kind = if self.eat(close) {
             // Empty vector
-            ExprKind::Array(Vec::new(), None)
+            ExprKind::Array(Vec::new(), false)
         } else {
             // Non-empty vector
             // TODO: Handle [..0] case
@@ -1054,8 +1054,8 @@ impl<'a> Parser<'a> {
             } else if self.check(&token::Comma) {
                 // Vector with two or more elements.
                 let mut exprs = vec![first_expr];
-                let mut fill_expr = None;
-                while !self.check(close) && fill_expr.is_none() {
+                let mut fill_to_size = false;
+                while !self.check(close) && !fill_to_size {
                     // Try to read a comma separator.
                     let sep = &token::Comma;
                     let sep_err = match self.expect(sep) {
@@ -1081,15 +1081,13 @@ impl<'a> Parser<'a> {
                             }
                             break;
                         }
-                        let is_fill_expr = self.eat(&token::DotDot);
+                        fill_to_size = self.eat(&token::DotDot);
                         match self.parse_expr() {
                             Ok(t) => {
-                                if is_fill_expr {
-                                    fill_expr = Some(t);
+                                if fill_to_size {
                                     // TODO: Recover array after dotdot
-                                } else {
-                                    exprs.push(t);
                                 }
+                                exprs.push(t);
                                 Ok(())
                             }
                             Err(expr_err) => Err(expr_err),
@@ -1122,11 +1120,11 @@ impl<'a> Parser<'a> {
                     }
                 }
                 self.expect(close)?;
-                ExprKind::Array(exprs, fill_expr)
+                ExprKind::Array(exprs, fill_to_size)
             } else {
                 // Vector with one element
                 self.expect(close)?;
-                ExprKind::Array(vec![first_expr], None)
+                ExprKind::Array(vec![first_expr], false)
             }
         };
         let expr = self.mk_expr(lo.to(self.prev_token.span), kind, attrs);

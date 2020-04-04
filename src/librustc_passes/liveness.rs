@@ -1117,10 +1117,7 @@ impl<'a, 'tcx> Liveness<'a, 'tcx> {
             }
 
             // Uninteresting cases: just propagate in rev exec order
-            hir::ExprKind::Array(ref exprs, ref fill_expr) => {
-                let succ = self.propagate_through_opt_expr(fill_expr.as_ref().map(|e| &**e), succ);
-                self.propagate_through_exprs(exprs, succ)
-            }
+            hir::ExprKind::Array(ref exprs, _) => self.propagate_through_exprs(exprs, succ),
 
             hir::ExprKind::Struct(_, ref fields, ref with_expr) => {
                 let succ = self.propagate_through_opt_expr(with_expr.as_ref().map(|e| &**e), succ);

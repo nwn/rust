@@ -129,7 +129,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 let source = unpack!(block = this.as_operand(block, scope, source));
                 block.and(Rvalue::Cast(CastKind::Pointer(cast), source, expr.ty))
             }
-            ExprKind::Array { fields, fill_expr: _ } => {
+            ExprKind::Array { fields, fill_to_size: _ } => {
                 // (*) We would (maybe) be closer to codegen if we
                 // handled this and other aggregate cases via
                 // `into()`, not `as_rvalue` -- in that case, instead
